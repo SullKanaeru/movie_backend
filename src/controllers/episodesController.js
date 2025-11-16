@@ -1,7 +1,7 @@
 const episodesModel = require("../models/episodes");
 const seriesModel = require("../models/series");
 
-// CREATE - Tambah Episode Baru
+// CREATE 
 const createEpisode = async (req, res) => {
   try {
     const {
@@ -15,7 +15,6 @@ const createEpisode = async (req, res) => {
       thumbnail_url,
     } = req.body;
 
-    // Jika episode_number tidak diberikan, auto-generate
     let finalEpisodeNumber = episode_number;
     if (!episode_number) {
       finalEpisodeNumber = await episodesModel.getNextEpisodeNumber(
@@ -51,7 +50,7 @@ const createEpisode = async (req, res) => {
   }
 };
 
-// READ - Get Episodes by Series
+// READ
 const getEpisodesBySeries = async (req, res) => {
   try {
     const { seriesId } = req.params;
@@ -81,7 +80,7 @@ const getEpisodesBySeries = async (req, res) => {
   }
 };
 
-// UPDATE - Update Episode
+// UPDATE
 const updateEpisode = async (req, res) => {
   try {
     const { id } = req.params;
@@ -115,7 +114,7 @@ const updateEpisode = async (req, res) => {
   }
 };
 
-// DELETE - Delete Episode
+// DELETE
 const deleteEpisode = async (req, res) => {
   try {
     const { id } = req.params;

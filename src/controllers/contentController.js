@@ -2,7 +2,39 @@ const contentBaseModel = require("../models/contentBase");
 const seriesModel = require("../models/series");
 const moviesModel = require("../models/movies");
 
-// CREATE - Tambah Series Baru
+// Helper function to parse query parameters
+const parseQueryParams = (query) => {
+  const filters = {};
+  const sort = {};
+  const pagination = {};
+
+  // Parse filters
+  if (query.type) filters.content_type = query.type;
+  if (query.search) filters.search = query.search;
+  if (query.film_rating) filters.film_rating = query.film_rating;
+  if (query.age_rating) filters.age_rating = query.age_rating;
+  if (query.release_year) filters.release_year = parseInt(query.release_year);
+  if (query.min_release_date) filters.min_release_date = query.min_release_date;
+  if (query.max_release_date) filters.max_release_date = query.max_release_date;
+  if (query.status) filters.status = query.status;
+  if (query.min_episodes) filters.min_episodes = parseInt(query.min_episodes);
+  if (query.max_episodes) filters.max_episodes = parseInt(query.max_episodes);
+  if (query.min_seasons) filters.min_seasons = parseInt(query.min_seasons);
+  if (query.min_duration) filters.min_duration = parseInt(query.min_duration);
+  if (query.max_duration) filters.max_duration = parseInt(query.max_duration);
+
+  // Parse sorting
+  if (query.sort_by) sort.field = query.sort_by;
+  if (query.sort_order) sort.order = query.sort_order;
+
+  // Parse pagination
+  if (query.page) pagination.page = parseInt(query.page);
+  if (query.limit) pagination.limit = parseInt(query.limit);
+
+  return { filters, sort, pagination };
+};
+
+// CREATE SERIES
 const createSeries = async (req, res) => {
   try {
     const {
@@ -21,7 +53,6 @@ const createSeries = async (req, res) => {
       next_episode_date,
     } = req.body;
 
-    // 1. Buat content_base terlebih dahulu
     const [contentBaseId] = await contentBaseModel.create({
       title,
       description,
@@ -34,7 +65,6 @@ const createSeries = async (req, res) => {
       age_rating,
     });
 
-    // 2. Buat series data
     const [seriesId] = await seriesModel.create({
       content_base_id: contentBaseId,
       episode_duration,
@@ -60,7 +90,7 @@ const createSeries = async (req, res) => {
   }
 };
 
-// CREATE - Tambah Movie Baru
+// CREATE MOVIE
 const createMovie = async (req, res) => {
   try {
     const {
@@ -75,7 +105,6 @@ const createMovie = async (req, res) => {
       duration,
     } = req.body;
 
-    // 1. Buat content_base terlebih dahulu
     const [contentBaseId] = await contentBaseModel.create({
       title,
       description,
@@ -88,7 +117,6 @@ const createMovie = async (req, res) => {
       age_rating,
     });
 
-    // 2. Buat movie data
     const [movieId] = await moviesModel.create({
       content_base_id: contentBaseId,
       duration,
@@ -110,27 +138,46 @@ const createMovie = async (req, res) => {
   }
 };
 
-// READ - Get All Content
+// READ ALL CONTENT WITH FILTERS, SEARCH, SORTING, PAGINATION
 const getAllContent = async (req, res) => {
   try {
+    const { filters, sort, pagination } = parseQueryParams(req.query);
     const { type, search } = req.query;
 
     let content;
+    let totalCount = 0;
 
     if (type === "series") {
-      content = await seriesModel.getAllWithContent();
+      content = await seriesModel.getAllWithContent(filters, sort, pagination);
+      totalCount = await seriesModel.getCount(filters);
     } else if (type === "movie") {
-      content = await moviesModel.getAllWithContent();
+      content = await moviesModel.getAllWithContent(filters, sort, pagination);
+      totalCount = await moviesModel.getCount(filters);
     } else if (search) {
-      content = await contentBaseModel.searchByTitle(search);
+      filters.search = search;
+      content = await contentBaseModel.getAll(filters, sort, pagination);
+      totalCount = await contentBaseModel.getCount(filters);
     } else {
-      content = await contentBaseModel.getAll();
+      content = await contentBaseModel.getAll(filters, sort, pagination);
+      totalCount = await contentBaseModel.getCount(filters);
     }
 
-    res.json({
+    const response = {
       success: true,
       data: content,
-    });
+      pagination: {
+        total: totalCount,
+        page: pagination.page || 1,
+        limit: pagination.limit || content.length,
+        totalPages: pagination.limit
+          ? Math.ceil(totalCount / pagination.limit)
+          : 1,
+      },
+      filters: filters,
+      sort: sort,
+    };
+
+    res.json(response);
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -140,7 +187,7 @@ const getAllContent = async (req, res) => {
   }
 };
 
-// READ - Get Content by ID
+// READ CONTENT BY ID
 const getContentById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -179,7 +226,7 @@ const getContentById = async (req, res) => {
   }
 };
 
-// UPDATE - Update Content
+// UPDATE CONTENT
 const updateContent = async (req, res) => {
   try {
     const { id } = req.params;
@@ -210,7 +257,7 @@ const updateContent = async (req, res) => {
   }
 };
 
-// DELETE - Delete Content
+// DELETE CONTENT
 const deleteContent = async (req, res) => {
   try {
     const { id } = req.params;

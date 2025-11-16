@@ -3,8 +3,8 @@ const contentBase = require("./contentBase");
 
 const TABLE_NAME = "series";
 
-const getAllWithContent = async () => {
-  return knex({ s: TABLE_NAME })
+const getAllWithContent = async (filters = {}, sort = {}, pagination = {}) => {
+  let query = knex({ s: TABLE_NAME })
     .select(
       "s.id_series",
       "s.episode_duration",
@@ -28,8 +28,78 @@ const getAllWithContent = async () => {
       "s.content_base_id",
       "=",
       "cb.id_content_base"
-    )
-    .orderBy("cb.release_date", "desc");
+    );
+
+  // Apply filters
+  if (filters.status) {
+    query = query.where("s.status", filters.status);
+  }
+
+  if (filters.min_episodes) {
+    query = query.where("s.total_episodes", ">=", filters.min_episodes);
+  }
+
+  if (filters.max_episodes) {
+    query = query.where("s.total_episodes", "<=", filters.max_episodes);
+  }
+
+  if (filters.min_seasons) {
+    query = query.where("s.total_seasons", ">=", filters.min_seasons);
+  }
+
+  if (filters.film_rating) {
+    query = query.where("cb.film_rating", filters.film_rating);
+  }
+
+  if (filters.age_rating) {
+    query = query.where("cb.age_rating", filters.age_rating);
+  }
+
+  if (filters.release_year) {
+    query = query.whereRaw("YEAR(cb.release_date) = ?", [filters.release_year]);
+  }
+
+  // Apply search
+  if (filters.search) {
+    query = query.where(function () {
+      this.where("cb.title", "like", `%${filters.search}%`).orWhere(
+        "cb.description",
+        "like",
+        `%${filters.search}%`
+      );
+    });
+  }
+
+  // Apply sorting
+  const sortField = sort.field || "cb.release_date";
+  const sortOrder = sort.order || "desc";
+
+  // Handle special sorting cases
+  if (
+    sort.field === "episode_duration" ||
+    sort.field === "total_episodes" ||
+    sort.field === "total_seasons"
+  ) {
+    query = query.orderBy(`s.${sort.field}`, sortOrder);
+  } else if (
+    sort.field === "title" ||
+    sort.field === "release_date" ||
+    sort.field === "film_rating"
+  ) {
+    query = query.orderBy(`cb.${sort.field}`, sortOrder);
+  } else {
+    query = query.orderBy(sortField, sortOrder);
+  }
+
+  // Apply pagination
+  if (pagination.page && pagination.limit) {
+    const offset = (pagination.page - 1) * pagination.limit;
+    query = query.offset(offset).limit(pagination.limit);
+  } else if (pagination.limit) {
+    query = query.limit(pagination.limit);
+  }
+
+  return query;
 };
 
 const findByIdWithContent = async (id) => {
@@ -62,8 +132,8 @@ const findByIdWithContent = async (id) => {
     .first();
 };
 
-const findByStatus = async (status) => {
-  return knex({ s: TABLE_NAME })
+const findByStatus = async (status, filters = {}) => {
+  let query = knex({ s: TABLE_NAME })
     .select(
       "s.id_series",
       "s.status",
@@ -77,8 +147,43 @@ const findByStatus = async (status) => {
       "=",
       "cb.id_content_base"
     )
-    .where("s.status", status)
-    .orderBy("s.next_episode_date", "asc");
+    .where("s.status", status);
+
+  // Apply additional filters
+  if (filters.film_rating) {
+    query = query.where("cb.film_rating", filters.film_rating);
+  }
+
+  return query.orderBy("s.next_episode_date", "asc");
+};
+
+const getCount = async (filters = {}) => {
+  let query = knex({ s: TABLE_NAME })
+    .count("* as total")
+    .join(
+      { cb: contentBase.tableName },
+      "s.content_base_id",
+      "=",
+      "cb.id_content_base"
+    );
+
+  // Apply same filters as getAllWithContent
+  if (filters.status) {
+    query = query.where("s.status", filters.status);
+  }
+
+  if (filters.search) {
+    query = query.where(function () {
+      this.where("cb.title", "like", `%${filters.search}%`).orWhere(
+        "cb.description",
+        "like",
+        `%${filters.search}%`
+      );
+    });
+  }
+
+  const result = await query.first();
+  return result.total;
 };
 
 const create = async (data) => {
@@ -117,6 +222,7 @@ module.exports = {
   getAllWithContent,
   findByIdWithContent,
   findByStatus,
+  getCount,
   create,
   updateStatus,
   incrementEpisodeCount,

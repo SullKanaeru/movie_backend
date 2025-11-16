@@ -2,22 +2,28 @@ const express = require("express");
 const router = express.Router();
 const contentController = require("../controllers/contentController");
 const episodesController = require("../controllers/episodesController");
+const { authMiddleware } = require("../middleware/authMiddleware");
 
 // Content Routes
-router.post("/series", contentController.createSeries);
-router.post("/movies", contentController.createMovie);
-router.get("/", contentController.getAllContent);
-router.get("/:id", contentController.getContentById);
-router.put("/:id", contentController.updateContent);
-router.delete("/:id", contentController.deleteContent);
+router.post("/series", authMiddleware, contentController.createSeries);
+router.post("/movies", authMiddleware, contentController.createMovie);
+router.get("/", authMiddleware, contentController.getAllContent);
+router.get("/:id", authMiddleware, contentController.getContentById);
+router.put("/:id", authMiddleware, contentController.updateContent);
+router.delete("/:id", authMiddleware, contentController.deleteContent);
 
 // Episodes Routes
-router.post("/episodes", episodesController.createEpisode);
+router.post("/episodes", authMiddleware, episodesController.createEpisode);
 router.get(
-  "/series/:seriesId/episodes", 
+  "/series/:seriesId/episodes",
+  authMiddleware,
   episodesController.getEpisodesBySeries
 );
-router.put("/episodes/:id", episodesController.updateEpisode);
-router.delete("/episodes/:id", episodesController.deleteEpisode);
+router.put("/episodes/:id", authMiddleware, episodesController.updateEpisode);
+router.delete(
+  "/episodes/:id",
+  authMiddleware,
+  episodesController.deleteEpisode
+);
 
 module.exports = router;
